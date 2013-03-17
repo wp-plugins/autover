@@ -4,7 +4,7 @@
  * Plugin URI: http://wordpress.org/extend/plugins/autover/
  * Description: Automatically version your CSS and JS files.
  * Author: PressLabs
- * Version: 1.0
+ * Version: 1.1
  * Author URI: http://www.presslabs.com/
  */
 
@@ -105,18 +105,18 @@ if ( $autover_dev_mode[1] > '' )
 function autover_update_options() {
 	$autover_dev_mode_value = array( '', '' );
 
-	$status = true;
+	$status = false;
 	if ( isset( $_POST['autover_dev_mode_style'] ) ) {
 		$autover_dev_mode_value[0] = '1';
-		$status = false;
+		$status = true;
 	}
 	if ( isset( $_POST['autover_dev_mode_script'] ) ) {
 		$autover_dev_mode_value[1] = '1';
-		$status = false;
+		$status = true;
 	}
-	$status = update_option('autover_dev_mode', $autover_dev_mode_value);
-	if ( ($autover_dev_mode_value[0]=='') && ($autover_dev_mode_value[1]=='') )
-		$status = false;
+	update_option('autover_dev_mode', $autover_dev_mode_value);
+	//if ( ($autover_dev_mode_value[0]=='') && ($autover_dev_mode_value[1]=='') )
+		//$status = false;
 
 	if ($status) { ?>
 		<div id="message" class="updated fade">

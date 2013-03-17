@@ -4,7 +4,7 @@ Donate link: http://www.presslabs.com/
 Tags: auto, automatic, pages, head, css, wp_enqueue, filter, javascript, script, style, ver, version, versioning, autover, presslabs
 Requires at least: 3.5.1
 Tested up to: 3.5
-Stable tag: 1.0
+Stable tag: 1.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,10 +35,16 @@ none
 
 == Changelog ==
 
+= 1.1 =
+* fix some settings error.
+
 = 1.0 =
 * start version on WP.
 
 == Upgrade Notice ==
+
+= 1.1 =
+Fix some settings error.
 
 = 1.0 =
 Start version on WP.
