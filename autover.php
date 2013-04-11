@@ -147,6 +147,8 @@ function autover_update_options() {
 //--------------------------------------------------------------------
 
 function autover_options() {
+	isset( $_GET['tab'] ) ? $tab = $_GET['tab'] : $tab = 'important' ;
+
 	if ( isset( $_POST['submit_settings'] ) ) {
 		autover_update_options();
 	}
@@ -154,11 +156,54 @@ function autover_options() {
 
 <div class="wrap">
 
-
-
 <div id="icon-tools" class="icon32">&nbsp;</div>
-<h2>Settings</h2>
+<h2 class="nav-tab-wrapper">
+<a class="nav-tab<?php if($selected_tab=='important')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=important">
+<span style="color:red;">IMPORTANT!</span></a>
+<a class="nav-tab<?php if($selected_tab=='settings')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=settings">Settings</a>
+</h2>
 
+
+
+
+
+
+
+<?php if ( $tab == 'important' ) { ?>
+
+<p>
+<h3><span style="color:red;font-weight:bold;">IMPORTANT !!!</span></h3>
+If you want to use the functionality of this plugin you must add 
+<strong>CSS styles</strong> and <strong>JS scripts</strong> with WordPress function 
+<a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_script" target="_blank"><strong>'wp_enqueue_script'</strong></a> and 
+<a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_style" target="_blank"><strong>'wp_enqueue_style'</strong></a>.
+</p>
+
+
+<p>
+<h3><span style="color:black;font-weight:bold;">Example:</span></h3>
+
+<h3><span style="color:green;font-weight:bold;">YES</span></h3>
+<img src="<?php echo plugins_url('/img/wp-enqueue.png', __FILE__); ?>" alt="wp-enqueue" title="CORRECT CODE">
+
+<h3><span style="color:red;font-weight:bold;">NO</span></h3>
+<img src="<?php echo plugins_url('/img/wp-head.png', __FILE__); ?>" alt="wp-head" title="DO NOT USE THIS CODE">
+
+<h3 style="font-weight:normal;">If you want to use <strong>'wp_enqueue_style'</strong> to add your <strong>'style.css'</strong> of your theme.<br />Add the next code to your theme file <strong>'functions.php'</strong> <span style="color:red;font-weight:bold;">and remove your &lt;link&gt; tag</span> from <strong>'header.php'</strong> which refer to your <strong>'style.css'</strong>.</h3>
+<img src="<?php echo plugins_url('/img/my-theme-name.png', __FILE__); ?>" alt="my-theme-name" title="add this code to 'functions.php' file">
+</p>
+
+<?php } ?>
+
+
+
+
+
+
+
+
+
+<?php if ( $tab == 'settings' ) { ?>
 
 <?php 
 	$autover_dev_mode = get_option('autover_dev_mode');
@@ -208,28 +253,14 @@ function autover_options() {
 
 </form>
 
-
-<p>
-<h3><span style="color:red;font-weight:bold;">IMPORTANT !!!</span></h3>
-If you want to use the functionality of this plugin you must add 
-<strong>CSS styles</strong> and <strong>JS scripts</strong> with WordPress function 
-<a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_script" target="_blank"><strong>'wp_enqueue_script'</strong></a> and 
-<a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_style" target="_blank"><strong>'wp_enqueue_style'</strong></a>.
-</p>
+<?php } ?>
 
 
-<p>
-<h3><span style="color:black;font-weight:bold;">Example:</span></h3>
 
-<h3><span style="color:green;font-weight:bold;">YES</span></h3>
-<img src="<?php echo plugins_url('/img/wp-enqueue.png', __FILE__); ?>" alt="wp-enqueue" title="CORRECT CODE">
 
-<h3><span style="color:red;font-weight:bold;">NO</span></h3>
-<img src="<?php echo plugins_url('/img/wp-head.png', __FILE__); ?>" alt="wp-head" title="DO NOT USE THIS CODE">
 
-<h3 style="font-weight:normal;">If you want to use <strong>'wp_enqueue_style'</strong> to add your <strong>'style.css'</strong> of your theme.<br />Add the next code to your theme file <strong>'functions.php'</strong> <span style="color:red;font-weight:bold;">and remove your &lt;link&gt; tag</span> from <strong>'header.php'</strong> which refer to your <strong>'style.css'</strong>.</h3>
-<img src="<?php echo plugins_url('/img/my-theme-name.png', __FILE__); ?>" alt="my-theme-name" title="add this code to 'functions.php' file">
-</p>
+
+
 
 
 </div><!-- .wrap -->
