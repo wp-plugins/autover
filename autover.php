@@ -158,9 +158,9 @@ function autover_options() {
 
 <div id="icon-tools" class="icon32">&nbsp;</div>
 <h2 class="nav-tab-wrapper">
-<a class="nav-tab<?php if($selected_tab=='important')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=important">
+<a class="nav-tab<?php if($tab=='important')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=important">
 <span style="color:red;">IMPORTANT!</span></a>
-<a class="nav-tab<?php if($selected_tab=='settings')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=settings">Settings</a>
+<a class="nav-tab<?php if($tab=='settings')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=settings">Settings</a>
 </h2>
 
 
