@@ -4,23 +4,51 @@
  * Plugin URI: http://wordpress.org/extend/plugins/autover/
  * Description: Automatically version your CSS and JS files.
  * Author: PressLabs
- * Version: 1.2
+ * Version: 1.3
  * Author URI: http://www.presslabs.com/
  */
+
+require_once('simplehtmldom.php');
 
 //--------------------------------------------------------------------
 
 function autover_activate() {
+	autover_delete_options();
+
 	add_option('autover_dev_mode', array('1','1') );
+	add_option('autover_is_working', true );
+
+	add_option('autover_versioned_css_files', array() );
+	add_option('autover_not_versioned_css_files', array() );
+	add_option('autover_not_correct_css_files', array() );
+
+	add_option('autover_versioned_js_files', array() );
+	add_option('autover_not_versioned_js_files', array() );
+	add_option('autover_not_correct_js_files', array() );
 }
 register_activation_hook(__FILE__,'autover_activate');
 
 //--------------------------------------------------------------------
 
 function autover_deactivate() {
-	delete_option('autover_dev_mode');
+	autover_delete_options();
 }
 register_deactivation_hook(__FILE__,'autover_deactivate');
+
+//--------------------------------------------------------------------
+
+function autover_delete_options() {
+	delete_option('autover_dev_mode');
+	delete_option('autover_is_working');
+
+	delete_option('autover_versioned_css_files');
+	delete_option('autover_not_versioned_css_files');
+	delete_option('autover_not_correct_css_files');
+
+	delete_option('autover_versioned_js_files');
+	delete_option('autover_not_versioned_js_files');
+	delete_option('autover_not_correct_js_files');
+}
 
 //--------------------------------------------------------------------
 //
@@ -28,7 +56,7 @@ register_deactivation_hook(__FILE__,'autover_deactivate');
 //
 function autover_settings_link($links) { 
 	$plugin = plugin_basename(__FILE__); 
-	$settings_link = '<a href="tools.php?page='.$plugin.'">Settings</a>'; 
+	$settings_link = '<a href="tools.php?page='.$plugin.'">'. __('Settings').'</a>'; 
 	array_unshift($links, $settings_link);
 
 	return $links; 
@@ -52,61 +80,136 @@ function autover_str_between( $start, $end, $content ) {
 	return '';
 }
 
+//------------------------------------------------------------------------
+
+function autover_string2link($string) {
+	return '<a href="'.$string.'">'.$string.'</a>';
+}
+
+//--------------------------------------------------------------------
+//
+// Remove the query from src.
+//
+function autover_remove_query($src) {
+	$src_query = autover_str_between( '?', '#', $src . '#' ); // Find the query.
+	$src_with_no_query = str_replace( $src_query, '', $src ); // Remove query if exist.
+	$src_with_no_query = str_replace( '?', '', $src_with_no_query ); // Remove '?' char.
+
+	return $src_with_no_query;
+}
+
+//--------------------------------------------------------------------
+//
+//  Just for debug
+//
+function autover_add_incorrect_style_and_script() {
+echo '
+<link rel="stylesheet" type="text/css" href="'.plugins_url('/autover.css',__FILE__).'" />
+<script src="'.plugins_url('/autover.js',__FILE__).'"></script> 
+';
+}
+//add_action('wp_head', 'autover_add_incorrect_style_and_script');
+//add_action('admin_head', 'autover_add_incorrect_style_and_script');
+
 //--------------------------------------------------------------------
 //
 // Return the  file with the new version.
 //
 function autover_version_filter($src) {
+	$out_src = $src;
+
+	//
+	// Remove the old version if exist.
+	//
+	$src_with_no_query = autover_remove_query( $out_src );
+
+	//
+	// Get the filetype of the file (JS or CSS)
+	//
+	( strtolower( substr( $src_with_no_query, -2 ) ) == 'js' ) ? $filetype = 'js' : null ;
+	( strtolower( substr( $src_with_no_query, -3 ) ) == 'css' ) ? $filetype = 'css' : null ;
+
+	$active = false;
+	$autover_dev_mode = get_option('autover_dev_mode', array('','') );
+	if ( (($autover_dev_mode[0] <> '') && ($filetype == 'css')) || (($autover_dev_mode[1] <> '') && ($filetype == 'js')) )
+		$active = true;
+
+	//
+	// get versioned/not_versioned files
+	//
+	$autover_versioned_files = get_option('autover_versioned_'.$filetype.'_files', array() );
+	$autover_not_versioned_files = get_option('autover_not_versioned_'.$filetype.'_files', array() );
+
 	//
 	// Parse the url of the input file.
 	//
-  	$src_parsed = parse_url( $src );
+  	$src_parsed = parse_url( $out_src );
 	$src_path = $src_parsed["path"];
 
 	$filename = $_SERVER['DOCUMENT_ROOT'] . $src_path;
-	if ( is_file($filename) )
+	if ( is_file( $filename ) )
 	{
-	//
-	// Extract the modification time of the input file.
-	//
-	$timestamp_version = filemtime( $filename );
+		//
+		// Extract the modification time of the input file.
+		//
+		$timestamp_version = filemtime( $filename );
 
-	if ( $timestamp_version == NULL )
-		$timestamp_version = filemtime( utf8_decode($filename) );
+		if ( $timestamp_version == NULL )
+			$timestamp_version = filemtime( utf8_decode( $filename ) );
 	} else {
-		return $src;
+		//
+		// Add not versioned files.
+		//
+		array_push($autover_not_versioned_files, $out_src);
+		$autover_not_versioned_files = array_unique($autover_not_versioned_files);
+		sort($autover_not_versioned_files);
+		update_option('autover_not_versioned_'.$filetype.'_files', $autover_not_versioned_files );
+
+		return $out_src;
 	}
 
 	//
 	// If the file is not on the server then return the input file.
 	//
-	if ( ($timestamp_version == '') || ($timestamp_version == NULL) )
-		return $src;
+	if ( ($timestamp_version == '') || ($timestamp_version == NULL) ) {
+		//
+		// Add not versioned files.
+		//
+		array_push($autover_not_versioned_files, $out_src);
+		$autover_not_versioned_files = array_unique($autover_not_versioned_files);
+		sort($autover_not_versioned_files);
+		update_option('autover_not_versioned_'.$filetype.'_files', $autover_not_versioned_files );
 
-	//
-	// Remove the old version if exist.
-	//
-	$src_query = autover_str_between( '?', '#', $src . '#' ); // Find the query.
-	$src_with_no_query = str_replace( $src_query, '', $src ); // Remove query if exist.
-	$src_with_no_query = str_replace( '?', '', $src_with_no_query ); // Remove '?' char.
+		return $out_src;
+	}
 
 	//
 	// Create the new version.
 	//
 	$src_with_new_version = $src_with_no_query . '?ver=' . $timestamp_version;
 
-	return $src_with_new_version;
+	//
+	// Add versioned files.
+	//
+	array_push($autover_versioned_files, $src_with_no_query);
+	$autover_versioned_files = array_unique($autover_versioned_files);
+	sort($autover_versioned_files);
+	update_option('autover_versioned_'.$filetype.'_files', $autover_versioned_files );
+
+	if ( $active ) $out_src = $src_with_new_version;
+
+	return $out_src;
 }
 
 //
-// ASctivate/deactivate the filter if the options are set.
+// Activate/deactivate the filter if the options are set.
 //
-$autover_dev_mode = get_option('autover_dev_mode', array('','') );
+//$autover_dev_mode = get_option('autover_dev_mode', array('','') );
 
-if ( $autover_dev_mode[0] > '' )
+//if ( $autover_dev_mode[0] <> '' )
 	add_filter( 'style_loader_src', 'autover_version_filter', 10, 1 );
 
-if ( $autover_dev_mode[1] > '' )
+//if ( $autover_dev_mode[1] <> '' )
 	add_filter( 'script_loader_src', 'autover_version_filter', 10, 1 );
 
 //--------------------------------------------------------------------
@@ -114,53 +217,61 @@ if ( $autover_dev_mode[1] > '' )
 function autover_update_options() {
 	$autover_dev_mode_value = array( '', '' );
 
-	$status = false;
+	$autover_is_working = false;
 	if ( isset( $_POST['autover_dev_mode_style'] ) ) {
 		$autover_dev_mode_value[0] = '1';
-		$status = true;
+		$autover_is_working = true;
+	} else {
+		delete_option('autover_versioned_css_files');
+		delete_option('autover_not_versioned_css_files');
+		delete_option('autover_not_correct_css_files');
 	}
+
 	if ( isset( $_POST['autover_dev_mode_script'] ) ) {
 		$autover_dev_mode_value[1] = '1';
-		$status = true;
+		$autover_is_working = true;
+	} else {
+		delete_option('autover_versioned_js_files');
+		delete_option('autover_not_versioned_js_files');
+		delete_option('autover_not_correct_js_files');
 	}
-	update_option('autover_dev_mode', $autover_dev_mode_value);
-	//if ( ($autover_dev_mode_value[0]=='') && ($autover_dev_mode_value[1]=='') )
-		//$status = false;
 
-	if ($status) { ?>
+	update_option('autover_dev_mode', $autover_dev_mode_value);
+	update_option('autover_is_working', $autover_is_working );
+
+	if ($autover_is_working) { ?>
 		<div id="message" class="updated fade">
 			<p><strong>Saved options!</strong></p>
 		</div>
-	<?php } else { ?>
-		<div id="message" class="error fade">
-			<p>
-				<strong>
-					<span style="color:brown;">
-						This plugin is currently not used!
-					</span>
-				</strong>
-			</p>
-		</div>
-	<?php }
-}
+	<?php } else { 
+		delete_option('autover_dev_mode');
+		delete_option('autover_versioned_css_files');
+		delete_option('autover_not_versioned_css_files');
+		delete_option('autover_not_correct_css_files');
 
+		delete_option('autover_versioned_js_files');
+		delete_option('autover_not_versioned_js_files');
+		delete_option('autover_not_correct_js_files');
+		}
+}
 //--------------------------------------------------------------------
 
 function autover_options() {
-	isset( $_GET['tab'] ) ? $tab = $_GET['tab'] : $tab = 'important' ;
-
 	if ( isset( $_POST['submit_settings'] ) ) {
 		autover_update_options();
 	}
+
+	isset($_GET['tab']) ? $tab = $_GET['tab'] : $tab = 'important';
+
 ?>
 
 <div class="wrap">
 
 <div id="icon-tools" class="icon32">&nbsp;</div>
 <h2 class="nav-tab-wrapper">
-<a class="nav-tab<?php if($tab=='important')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=important">
-<span style="color:red;">IMPORTANT!</span></a>
+<a class="nav-tab<?php if($tab=='important')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=important"><span style="color:red;">IMPORTANT!</span></a>
 <a class="nav-tab<?php if($tab=='settings')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=settings">Settings</a>
+<a class="nav-tab<?php if($tab=='lists')echo' nav-tab-active';?>" href="tools.php?page=autover/autover.php&tab=lists">Lists</a>
 </h2>
 
 
@@ -171,10 +282,26 @@ function autover_options() {
 
 <?php if ( $tab == 'important' ) { ?>
 
+<?php
+	$autover_is_working = get_option('autover_is_working', false); 
+	if ( !$autover_is_working ) { ?>
+		<div id="message" class="error fade">
+			<p>
+				<strong>
+					<span style="color:brown;">
+						This plugin is currently not used!
+					</span>
+				</strong>
+			</p>
+		</div>
+<?php
+	}
+?>
+
+
+
 <p>
-<h3><span style="color:red;font-weight:bold;">IMPORTANT !!!</span></h3>
 If you want to use the functionality of this plugin you must add 
-<strong>CSS styles</strong> and <strong>JS scripts</strong> with WordPress function 
 <a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_script" target="_blank"><strong>'wp_enqueue_script'</strong></a> and 
 <a href="http://codex.wordpress.org/Function_Reference/wp_enqueue_style" target="_blank"><strong>'wp_enqueue_style'</strong></a>.
 </p>
@@ -184,13 +311,54 @@ If you want to use the functionality of this plugin you must add
 <h3><span style="color:black;font-weight:bold;">Example:</span></h3>
 
 <h3><span style="color:green;font-weight:bold;">YES</span></h3>
-<img src="<?php echo plugins_url('/img/wp-enqueue.png', __FILE__); ?>" alt="wp-enqueue" title="CORRECT CODE">
+<p style="background:#eaeaea; padding:5px;" title="CORRECT CODE">
+<?php
+$string = "<?php
+function autover_add_style_and_script() {
+	wp_enqueue_style('autover', plugins_url('/autover/mystyle.css',__FILLE_));
+	wp_enqueue_script('autover', plugins_url('/autover/myscript.js',__FILLE_));
+}
+add_action('wp_enqueue_scripts','autover_add_style_and_script');
+add_action('admin_enqueue_scripts','autover_add_style_and_script');
+?>";
+highlight_string($string); ?>
+</p>
+
+<!--img src="<?php echo plugins_url('/img/wp-enqueue.png', __FILE__); ?>" alt="wp-enqueue" title="CORRECT CODE"-->
 
 <h3><span style="color:red;font-weight:bold;">NO</span></h3>
-<img src="<?php echo plugins_url('/img/wp-head.png', __FILE__); ?>" alt="wp-head" title="DO NOT USE THIS CODE">
+<p style="background:#eaeaea; padding:5px;" title="DO NOT USE THIS CODE">
+<?php
+$string = "<?php
+function autover_add_style_and_script() {
+echo \"<link rel='stylesheet' href='\".plugins_url('/autover/mystyle.js',__FILLE_)
+	.\"' type='test/css' media='all' />
+<script src='\".plugins_url('/autover/mystyle.css',__FILLE_).\"'></script>
+\";
+}
+add_action('wp_head','autover_add_style_and_script');
+add_action('admin_head','autover_add_style_and_script');
+?>";
+highlight_string($string); ?>
+</p>
+
+<!--img src="<?php echo plugins_url('/img/wp-head.png', __FILE__); ?>" alt="wp-head" title="DO NOT USE THIS CODE"-->
 
 <h3 style="font-weight:normal;">If you want to use <strong>'wp_enqueue_style'</strong> to add your <strong>'style.css'</strong> of your theme.<br />Add the next code to your theme file <strong>'functions.php'</strong> <span style="color:red;font-weight:bold;">and remove your &lt;link&gt; tag</span> from <strong>'header.php'</strong> which refer to your <strong>'style.css'</strong>.</h3>
-<img src="<?php echo plugins_url('/img/my-theme-name.png', __FILE__); ?>" alt="my-theme-name" title="add this code to 'functions.php' file">
+<p style="background:#eaeaea; padding:5px;" title="add this code to 'functions.php' file">
+<?php
+$string = "<?php
+function mythemename_style() {
+	\$style_url = get_stylesheet_directory_uri() . '/style.css';
+
+	wp_enqueue_style('my_style_id', \$style_url, __FILE__);
+}
+add_action('wp_enqueue_scripts','mythemename_style');
+?>";
+highlight_string($string); ?>
+</p>
+
+<!--img src="<?php echo plugins_url('/img/my-theme-name.png', __FILE__); ?>" alt="mythemename" title="add this code to 'functions.php' file"-->
 </p>
 
 <?php } ?>
@@ -202,10 +370,23 @@ If you want to use the functionality of this plugin you must add
 
 
 
-
 <?php if ( $tab == 'settings' ) { ?>
 
-<?php 
+<?php
+	$autover_is_working = get_option('autover_is_working', false); 
+	if ( !$autover_is_working ) { ?>
+		<div id="message" class="error fade">
+			<p>
+				<strong>
+					<span style="color:brown;">
+						This plugin is currently not used!
+					</span>
+				</strong>
+			</p>
+		</div>
+<?php
+	}
+
 	$autover_dev_mode = get_option('autover_dev_mode');
 	$dev_mode_checked = array('','');
 	for ( $k = 0; $k < 2; $k++ )
@@ -253,6 +434,7 @@ If you want to use the functionality of this plugin you must add
 
 </form>
 
+
 <?php } ?>
 
 
@@ -263,8 +445,270 @@ If you want to use the functionality of this plugin you must add
 
 
 
+
+
+<?php if ( $tab == 'lists' ) { ?>
+
+<?php
+	$autover_is_working = get_option('autover_is_working', false); 
+	if ( !$autover_is_working ) { ?>
+		<div id="message" class="error fade">
+			<p>
+				<strong>
+					<span style="color:brown;">
+						This plugin is currently not used!
+					</span>
+				</strong>
+			</p>
+		</div>
+<?php
+	}
+?>
+
+<?php if ( isset($_POST['reset_lists']) ) autover_reset_lists(); ?>
+
+<?php if ( isset($_POST['refresh_lists']) ) autover_refresh_lists(); ?>
+
+<form method="post">
+<p class="submit">
+  Remove all data from the file lists (CSS and JS): <input type="submit" class="button button-primary" name="reset_lists" value="Reset"><br />
+  Scan the Homepage and detect the files added wrong (CSS and JS files): <input type="submit" class="button" name="refresh_lists" value="Refresh"><br />
+</p>
+</form>
+
+<?php
+	if ( $autover_is_working ) {
+		autover_show_not_correct_files();
+		autover_show_versioned_files(); 
+		autover_show_not_versioned_files();
+	} 
+?>
+
+<?php } ?>
+
+
+
+
+
+
+
 </div><!-- .wrap -->
-<?php }
+
+<?php
+}
+
+//--------------------------------------------------------------------
+// Remove all data from the file lists (CSS and JS).
+function autover_reset_lists() {
+	update_option('autover_versioned_css_files', array() );
+	update_option('autover_versioned_js_files', array() );
+
+	update_option('autover_not_versioned_css_files', array() );
+	update_option('autover_not_versioned_js_files', array() );
+
+	update_option('autover_not_correct_css_files', array() );
+	update_option('autover_not_correct_js_files', array() );
+}
+
+//--------------------------------------------------------------------
+// Scan the Homepage and detect the files added wrong (CSS and JS files).
+function autover_refresh_lists() {
+	autover_scan_not_correct_files();
+}
+
+//--------------------------------------------------------------------
+function autover_show_versioned_files() {
+?>
+
+<?php
+$autover_versioned_css_files = get_option('autover_versioned_css_files', array() );
+if ( !empty( $autover_versioned_css_files ) ) { ?>
+<fieldset>
+<pre>
+<legend><strong>Versioned CSS files:</strong></legend>
+<?php
+	$k = 1;
+	$empty_list = true;
+	sort($autover_versioned_css_files);
+	foreach( $autover_versioned_css_files as $versioned_css_file ) {
+		echo $k . ") " . autover_string2link($versioned_css_file)."\n";
+		$empty_list = false;
+		$k++;
+	}
+?>
+</pre>
+</fieldset>
+<?php if ( !$empty_list ) echo "<hr>";
+}
+?>
+
+
+
+<?php
+$autover_versioned_js_files = get_option('autover_versioned_js_files', array() );
+if ( !empty( $autover_versioned_js_files ) ) { ?>
+<fieldset>
+<pre>
+<legend><strong>Versioned JS files:</strong></legend>
+<?php
+	$k = 1;
+	$empty_list = true;
+	sort($autover_versioned_js_files);
+	foreach( $autover_versioned_js_files as $versioned_js_file ) {
+		echo $k . ") " . autover_string2link($versioned_js_file)."\n";
+		$empty_list = false;
+		$k++;
+	}
+?>
+</pre>
+</fieldset>
+<?php if ( !$empty_list ) echo "<hr>";
+}
+?>
+
+<?php
+}
+
+//--------------------------------------------------------------------
+
+function autover_show_not_versioned_files() {
+?>
+
+<?php
+$message = false;
+$autover_not_versioned_css_files = get_option('autover_not_versioned_css_files', array() );
+if ( !empty( $autover_not_versioned_css_files ) ) { 
+$message = true;
+?>
+<p>From various reasons, the next files are not versioned!</p>
+<fieldset>
+<pre>
+<legend><strong>Not versioned CSS files:</strong></legend>
+<?php
+	$k = 1;
+	$empty_list = true;
+
+	sort($autover_not_versioned_css_files);
+	foreach( $autover_not_versioned_css_files as $not_versioned_css_file ) {
+		echo $k . ") " . autover_string2link($not_versioned_css_file)."\n";
+		$empty_list = false;
+		$k++;
+	}
+?>
+</pre>
+</fieldset>
+<?php if ( !$empty_list ) echo "<hr>";
+}
+?>
+
+
+
+<?php
+$autover_not_versioned_js_files = get_option('autover_not_versioned_js_files', array() );
+if ( !empty( $autover_not_versioned_js_files ) ) { 
+if (!$message) { ?>
+<p>For various reason, the next files are not versioned!</p>
+<?php } ?>
+<fieldset>
+<pre>
+<legend><strong>Not versioned JS files:</strong></legend>
+<?php
+	$k = 1;
+	$empty_list = true;
+
+	sort($autover_not_versioned_js_files);
+	foreach( $autover_not_versioned_js_files as $not_versioned_js_file ) {
+		echo $k . ") " . autover_string2link($not_versioned_js_file)."\n";
+		$empty_list = false;
+		$k++;
+	}
+?>
+</pre>
+</fieldset>
+<?php if ( !$empty_list ) echo "<hr>";
+}
+?>
+
+<?php
+}
+
+//--------------------------------------------------------------------
+
+function autover_scan_not_correct_files() {
+$autover_versioned_css_files = get_option('autover_versioned_css_files', array() );
+$autover_versioned_js_files = get_option('autover_versioned_js_files', array() );
+
+$autover_not_versioned_css_files = get_option('autover_not_versioned_css_files', array() );
+$autover_not_versioned_js_files = get_option('autover_not_versioned_js_files', array() );
+?>
+
+<?php
+// Create DOM from URL or file
+$html = file_get_html( get_home_url() ); //$_SERVER['HTTP_REFERER'] );
+
+// Find all external style sheet
+$links = array();
+foreach($html->find('link') as $link_element) {
+	$src = autover_remove_query( $link_element->href );
+	if ( substr($src, -4) == '.css' )
+		array_push( $links, $src );
+}
+$autover_css_files = array_merge($autover_versioned_css_files, $autover_not_versioned_css_files);
+$out_intersect = array_intersect( $autover_css_files, $links );
+$out_links = array_unique( array_diff( $links, $out_intersect ) );
+
+
+// Find all external JS scripts
+$scripts = array();
+foreach($html->find('script') as $script_element) {
+	$src = autover_remove_query( $script_element->src );
+	array_push( $scripts, $src );
+}
+$autover_js_files = array_merge($autover_versioned_js_files, $autover_not_versioned_js_files);
+$out_intersect = array_intersect( $autover_js_files, $scripts );
+$out_scripts = array_unique( array_diff( $scripts, $out_intersect ) );
+  
+sort($out_links);   //print_r($out_links);
+sort($out_scripts); //print_r($out_scripts);
+
+update_option('autover_not_correct_css_files', $out_links );
+update_option('autover_not_correct_js_files', $out_scripts );
+}
+
+//------------------------------------------------------------------------
+
+function autover_show_not_correct_files() {
+$out_links = get_option('autover_not_correct_css_files', null);
+$out_scripts = get_option('autover_not_correct_js_files', null);
+?>
+<fieldset>
+<pre>
+<?php if ( !empty($out_links) || !empty($out_scripts) ) { ?>
+<legend><strong>Add the next files with correct method:</strong></legend>
+<?php
+	$k = 1;
+	$empty_list = true;
+
+	sort($out_links);
+	foreach($out_links as $link) {
+		echo $k . ") " . autover_string2link($link) . "\n";
+		$empty_list = false;
+		$k++;
+	}
+
+	sort($out_scripts);
+	foreach($out_scripts as $script) {
+		echo $k . ") " . autover_string2link($script) . "\n";
+		$empty_list = false;
+		$k++;
+	}
+}
+?>
+</pre>
+</fieldset>
+
+<?php if ( !$empty_list ) echo "<hr>";
+}
 
 //--------------------------------------------------------------------
 
