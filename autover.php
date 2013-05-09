@@ -283,7 +283,7 @@ function autover_options() {
 <?php if ( $tab == 'important' ) { ?>
 
 <?php
-	$autover_is_working = get_option('autover_is_working', false); 
+	$autover_is_working = get_option('autover_is_working', true); 
 	if ( !$autover_is_working ) { ?>
 		<div id="message" class="error fade">
 			<p>
@@ -373,7 +373,7 @@ highlight_string($string); ?>
 <?php if ( $tab == 'settings' ) { ?>
 
 <?php
-	$autover_is_working = get_option('autover_is_working', false); 
+	$autover_is_working = get_option('autover_is_working', true); 
 	if ( !$autover_is_working ) { ?>
 		<div id="message" class="error fade">
 			<p>
@@ -450,7 +450,7 @@ highlight_string($string); ?>
 <?php if ( $tab == 'lists' ) { ?>
 
 <?php
-	$autover_is_working = get_option('autover_is_working', false); 
+	$autover_is_working = get_option('autover_is_working', true); 
 	if ( !$autover_is_working ) { ?>
 		<div id="message" class="error fade">
 			<p>
