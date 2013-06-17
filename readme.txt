@@ -1,5 +1,5 @@
 === AutoVer ===
-Contributors: PressLabs, olarmarius
+Contributors: PressLabs
 Donate link: http://www.presslabs.com/
 Tags: auto, automatic, pages, head, css, wp-enqueue, filter, javascript, script, style, ver, version, versioning, autover, presslabs
 Requires at least: 3.5.1
